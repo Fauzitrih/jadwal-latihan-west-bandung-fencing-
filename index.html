@@ -758,7 +758,24 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_y9qdUOQ_xsHXxrFYSdO3HvZs-T6Vi08",
+      authDomain: "jadwal-latihan-west-bandung-fe.firebaseapp.com",
+      projectId: "jadwal-latihan-west-bandung-fe",
+      storageBucket: "jadwal-latihan-west-bandung-fe.firebasestorage.app",
+      messagingSenderId: "606105147355",
+      appId: "1:606105147355:web:a8d567b38719e4df5139fe",
+      measurementId: "G-1E25PY4P44",
+      databaseURL: "https://jadwal-latihan-west-bandung-fe-default-rtdb.asia-southeast1.firebasedatabase.app" // Asumsi server Singapore
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db, 'jadwal');
     const coaches = [
       { id: "coach-1", name: "Coach Derry", focus: "Epee", color: "#2c6bed" },
       { id: "coach-2", name: "Coach Fauzi", focus: "Foil", color: "#1f6f8b" },
@@ -775,12 +792,17 @@
       "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ];
 
-    // Storage key — now stores per-date schedule: { "2026-06-24": { "coach-1": ["Atlet A"], ... }, ... }
-    const storageKey = "jadwal-latihan-per-tanggal";
-
     // Current selected date key, e.g. "2026-06-24"
     let currentDateKey = formatDateKey(new Date());
-    let schedule = loadSchedule();
+    let schedule = {};
+
+    // Listen realtime updates dari Firebase
+    onValue(dbRef, (snapshot) => {
+      const data = snapshot.val();
+      schedule = data || {};
+      renderBoard();
+      renderCalendar();
+    });
 
     // Calendar view state
     let calViewDate = new Date();
@@ -823,15 +845,6 @@
     }
 
     // ─── Schedule Functions ───
-    function loadSchedule() {
-      try {
-        const saved = JSON.parse(localStorage.getItem(storageKey));
-        return (saved && typeof saved === "object") ? saved : {};
-      } catch {
-        return {};
-      }
-    }
-
     function saveSchedule() {
       // Clean up empty date entries
       const cleaned = {};
@@ -840,7 +853,12 @@
         if (hasAthletes) cleaned[dateKey] = coachData;
       }
       schedule = cleaned;
-      localStorage.setItem(storageKey, JSON.stringify(schedule));
+      
+      // Simpan ke Firebase
+      set(dbRef, schedule).catch((error) => {
+        console.error("Gagal menyimpan ke Firebase:", error);
+        showToast("Error koneksi database");
+      });
     }
 
     function getDateSchedule(dateKey) {
